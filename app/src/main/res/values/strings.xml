@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">Audio Player</string>
+    <string name="get_started">Get Started</string>
+    <string name="explore_artist">Explore Songs</string>
+    <string name="todo">TODO</string>
+    <string name="backbtnimage">backBtnImage</string>
+    <string name="avatarimage">avatarImage</string>
+    <string name="title">Title</string>
+    <string name="artist">artist</string>
+    <string name="_0_00">0:00</string>
+    <string name="play_btn_image">play btn image</string>
+    <string name="nextbtn">nextBtn</string>
+    <string name="prevbtn">prevBtn</string>
+    <string name="btnrepeat">btnRepeat</string>
+    <string name="buttonshuffle">buttonShuffle</string>
+    <string name="nav_music">音乐</string>
+    <string name="nav_cloud">云</string>
+    <string name="nav_settings">设置</string>
+    <string name="cloud_title">云同步</string>
+    <string name="cloud_subtitle">即将推出</string>
+    <string name="cloud_server_url">服务器地址</string>
+    <string name="cloud_username">用户名</string>
+    <string name="cloud_password">密码</string>
+    <string name="cloud_connect">连接</string>
+    <string name="cloud_disconnect">断开</string>
+    <string name="cloud_connecting">连接中...</string>
+    <string name="cloud_connect_failed">连接失败，请检查服务器地址和凭证</string>
+    <string name="cloud_no_files">没有音乐文件</string>
+    <string name="cloud_loading">加载中...</string>
+    <string name="cloud_directory">文件夹</string>
+    <string name="settings_title">设置</string>
+    <string name="settings_subtitle">个性化配置</string>
+</resources>
