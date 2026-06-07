@@ -22,7 +22,6 @@
         android:id="@+id/miniPlayer"
         android:layout_width="0dp"
         android:layout_height="56dp"
-        android:background="@drawable/gradient_bg"
         android:visibility="gone"
         android:clickable="true"
         android:focusable="true"
