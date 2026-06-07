@@ -1,5 +1,7 @@
 package com.shahadot.android_music_player;
 
+import android.content.Context;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -7,9 +9,11 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.bumptech.glide.Glide;
 import com.shahadot.android_music_player.databinding.ItemSongBinding;
 import com.shahadot.android_music_player.WebDavClient.CloudFile;
 
+import java.io.File;
 import java.util.List;
 
 public class CloudSongAdapter extends RecyclerView.Adapter<CloudSongAdapter.ViewHolder> {
@@ -45,7 +49,25 @@ public class CloudSongAdapter extends RecyclerView.Adapter<CloudSongAdapter.View
             holder.binding.imageAlbumArt.setImageResource(R.drawable.ic_folder_24);
         } else {
             holder.binding.textArtist.setText(file.getFormattedSize());
-            holder.binding.imageAlbumArt.setImageResource(R.drawable.ic_music_note_24);
+
+            // Check if cover art is cached (from a previous play in PlayerActivity)
+            if (file.directUrl != null) {
+                Context ctx = holder.binding.getRoot().getContext();
+                String cacheKey = String.valueOf(file.directUrl.hashCode());
+                File cacheFile = new File(ctx.getCacheDir(), "album_covers/" + cacheKey + ".jpg");
+                if (cacheFile.exists()) {
+                    Glide.with(ctx)
+                            .load(Uri.fromFile(cacheFile))
+                            .circleCrop()
+                            .placeholder(R.drawable.ic_music_note_24)
+                            .error(R.drawable.ic_music_note_24)
+                            .into(holder.binding.imageAlbumArt);
+                } else {
+                    holder.binding.imageAlbumArt.setImageResource(R.drawable.ic_music_note_24);
+                }
+            } else {
+                holder.binding.imageAlbumArt.setImageResource(R.drawable.ic_music_note_24);
+            }
         }
 
         holder.itemView.setOnClickListener(v -> {

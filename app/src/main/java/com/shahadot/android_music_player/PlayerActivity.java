@@ -6,6 +6,7 @@ import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.ContentUris;
 import android.content.Intent;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,10 +28,20 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.shahadot.android_music_player.databinding.ActivityPlayerBinding;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import jp.wasabeef.glide.transformations.BlurTransformation;
 
 public class PlayerActivity extends AppCompatActivity {
@@ -43,6 +54,8 @@ public class PlayerActivity extends AppCompatActivity {
     private int currentIndex = 0;
 
     private final NowPlayingStore store = NowPlayingStore.getInstance();
+    private final ExecutorService coverLoader = Executors.newSingleThreadExecutor();
+    private volatile String pendingCoverUrl = null;
 
     private final Runnable updateRunnable = new Runnable() {
         @Override
@@ -239,28 +252,40 @@ public class PlayerActivity extends AppCompatActivity {
         binding.textArtist.setText(song.artist != null ? song.artist : "No Artist");
         setTitle(song.title);
 
-        Uri albumArtUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), song.albumId);
+        // Reset to placeholder; cover will be loaded asynchronously
+        binding.imageAlbumArtPlayer.setImageResource(R.drawable.ic_music_note_24);
+        binding.bgAlbumArt.setImageResource(R.drawable.ic_music_note_24);
 
-        if (hasAlbumArt(albumArtUri)) {
-            Glide.with(this)
-                    .asBitmap()
-                    .load(albumArtUri)
-                    .circleCrop()
-                    .placeholder(R.drawable.ic_music_note_24)
-                    .error(R.drawable.ic_music_note_24)
-                    .into(binding.imageAlbumArtPlayer);
-
-            Glide.with(this)
-                    .asBitmap()
-                    .load(albumArtUri)
-                    .apply(bitmapTransform(new BlurTransformation(25, 3)))
-                    .placeholder(R.drawable.ic_music_note_24)
-                    .error(R.drawable.ic_music_note_24)
-                    .into(binding.bgAlbumArt);
+        if (isCloudSong(song)) {
+            loadCloudCoverAsync(song);
         } else {
-            binding.imageAlbumArtPlayer.setImageResource(R.drawable.ic_music_note_24);
-            binding.bgAlbumArt.setImageResource(R.drawable.ic_music_note_24);
+            Uri albumArtUri = ContentUris.withAppendedId(
+                    Uri.parse("content://media/external/audio/albumart"), song.albumId);
+
+            if (hasAlbumArt(albumArtUri)) {
+                Glide.with(this)
+                        .asBitmap()
+                        .load(albumArtUri)
+                        .circleCrop()
+                        .placeholder(R.drawable.ic_music_note_24)
+                        .error(R.drawable.ic_music_note_24)
+                        .into(binding.imageAlbumArtPlayer);
+
+                Glide.with(this)
+                        .asBitmap()
+                        .load(albumArtUri)
+                        .apply(bitmapTransform(new BlurTransformation(25, 3)))
+                        .placeholder(R.drawable.ic_music_note_24)
+                        .error(R.drawable.ic_music_note_24)
+                        .into(binding.bgAlbumArt);
+            }
         }
+    }
+
+    private boolean isCloudSong(Song song) {
+        return song.albumId == 0
+                && song.data != null
+                && (song.data.startsWith("http://") || song.data.startsWith("https://"));
     }
 
     private boolean hasAlbumArt(Uri albumArtUri) {
@@ -269,6 +294,149 @@ public class PlayerActivity extends AppCompatActivity {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    private void loadCloudCoverAsync(Song song) {
+        if (song.data == null) return;
+
+        File cacheDir = new File(getCacheDir(), "album_covers");
+        String cacheKey = String.valueOf(song.data.hashCode());
+        File cacheFile = new File(cacheDir, cacheKey + ".jpg");
+
+        if (cacheFile.exists()) {
+            setCoverFromFile(cacheFile);
+            return;
+        }
+
+        pendingCoverUrl = song.data;
+        coverLoader.execute(() -> {
+            File tempFile = null;
+            try {
+                WebDavClient client = store.webDavClient;
+
+                // Step 1: Download audio file header (handles auth + redirect)
+                byte[] header;
+                if (client != null) {
+                    // Use WebDavClient's infrastructure (SSL, auth, redirect)
+                    header = client.downloadAudioHeader(song.data, 2097152);
+                } else {
+                    // Fallback: direct download without auth (rare for cloud songs)
+                    header = downloadFallback(song.data);
+                }
+
+                if (header == null || header.length == 0) return;
+
+                tempFile = File.createTempFile("cover_", ".tmp", getCacheDir());
+                try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+                    fos.write(header);
+                }
+
+                // Step 2: Extract embedded cover + album metadata from local temp file
+                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                mmr.setDataSource(tempFile.getAbsolutePath());
+                byte[] art = mmr.getEmbeddedPicture();
+
+                // Extract album info for dedup caching
+                String album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM);
+                String artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+                mmr.release();
+
+                String albumKey = CoverCache.buildAlbumKey(artist, album);
+
+                if (art != null) {
+                    //noinspection ResultOfMethodCallIgnored
+                    cacheDir.mkdirs();
+                    try (FileOutputStream fos = new FileOutputStream(cacheFile)) {
+                        fos.write(art);
+                    }
+
+                    // Register in album cache for future dedup
+                    if (albumKey != null) {
+                        CoverCache.registerAlbum(albumKey, cacheKey);
+                    }
+
+                    String current = pendingCoverUrl;
+                    if (song.data.equals(current)) {
+                        handler.post(() -> setCoverFromFile(cacheFile));
+                    }
+                } else if (albumKey != null) {
+                    // No embedded cover, but has album info — check if album's
+                    // first song already cached a cover (from preloader or previous play)
+                    String albumUrlHash = CoverCache.getAlbumUrlHash(albumKey);
+                    if (albumUrlHash != null) {
+                        File albumCover = new File(cacheDir, albumUrlHash + ".jpg");
+                        if (albumCover.exists()) {
+                            // Copy album cover to this song's cache entry
+                            cacheDir.mkdirs();
+                            try (InputStream src = new FileInputStream(albumCover);
+                                 FileOutputStream dst = new FileOutputStream(cacheFile)) {
+                                byte[] buf = new byte[8192];
+                                int n;
+                                while ((n = src.read(buf)) != -1) dst.write(buf, 0, n);
+                            }
+                            String current = pendingCoverUrl;
+                            if (song.data.equals(current)) {
+                                handler.post(() -> setCoverFromFile(cacheFile));
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // Keep showing placeholder
+            } finally {
+                if (tempFile != null && tempFile.exists()) {
+                    //noinspection ResultOfMethodCallIgnored
+                    tempFile.delete();
+                }
+            }
+        });
+    }
+
+    /** Fallback: download bytes without auth (for local or direct URLs). */
+    private byte[] downloadFallback(String urlStr) throws IOException {
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        try {
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setRequestProperty("Range", "bytes=0-2097151");
+            int code = conn.getResponseCode();
+            if (code != 200 && code != 206) return null;
+            try (InputStream is = conn.getInputStream();
+                 ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                byte[] buf = new byte[8192];
+                int len;
+                int total = 0;
+                while ((len = is.read(buf)) != -1 && total < 2097152) {
+                    baos.write(buf, 0, len);
+                    total += len;
+                }
+                return baos.toByteArray();
+            }
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private void setCoverFromFile(File cacheFile) {
+        Uri fileUri = Uri.fromFile(cacheFile);
+
+        Glide.with(this)
+                .asBitmap()
+                .load(fileUri)
+                .circleCrop()
+                .placeholder(R.drawable.ic_music_note_24)
+                .error(R.drawable.ic_music_note_24)
+                .into(binding.imageAlbumArtPlayer);
+
+        Glide.with(this)
+                .asBitmap()
+                .load(fileUri)
+                .apply(bitmapTransform(new BlurTransformation(25, 3)))
+                .placeholder(R.drawable.ic_music_note_24)
+                .error(R.drawable.ic_music_note_24)
+                .into(binding.bgAlbumArt);
     }
 
     @SuppressLint("DefaultLocale")
@@ -308,6 +476,8 @@ public class PlayerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(updateRunnable);
+        pendingCoverUrl = null;
+        coverLoader.shutdownNow();
         if (mediaController != null) {
             mediaController.release();
             mediaController = null;

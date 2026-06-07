@@ -13,6 +13,7 @@ public class NowPlayingStore {
     public List<Song> songList;
     public int currentIndex;
     public Map<String, String> requestHeaders;
+    public WebDavClient webDavClient;
 
     private NowPlayingStore() {}
 

@@ -40,6 +40,9 @@ render.experimental.xml
 *.jks
 *.keystore
 
+# Codegraph index
+.codegraph/
+
 # Google Services (e.g. APIs or Firebase)
 google-services.json
 

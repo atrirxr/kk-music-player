@@ -117,6 +117,7 @@ public class MusicFragment extends Fragment implements SongAdapter.OnItemClickLi
     @Override
     public void onItemClick(int position) {
         NowPlayingStore.getInstance().requestHeaders = null;
+        NowPlayingStore.getInstance().webDavClient = null;
         Intent intent = new Intent(getActivity(), PlayerActivity.class);
         intent.putParcelableArrayListExtra("songList", (ArrayList<Song>) songList);
         intent.putExtra("position", position);

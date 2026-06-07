@@ -42,6 +42,7 @@ public class WebDavClient {
         public long size;
         public boolean isDirectory;
         public String modifiedDate;
+        public String directUrl; // populated by CloudFragment for cache key matching
 
         private static final String[] AUDIO_EXTENSIONS = {
                 ".mp3", ".wav", ".flac", ".ogg", ".aac", ".wma", ".m4a", ".opus"
@@ -235,6 +236,75 @@ public class WebDavClient {
             headers.put("Authorization", authHeader);
         }
         return headers;
+    }
+
+    /**
+     * 下载音频文件头部（用于提取封面等元数据）。
+     * 处理 Alist → CDN 的重定向链，只对 Alist 发送认证头。
+     */
+    public byte[] downloadAudioHeader(String filePath, int maxBytes) throws IOException {
+        String url = (filePath.startsWith("http://") || filePath.startsWith("https://"))
+                ? filePath : getDirectUrl(filePath);
+        boolean needAuth = true;
+
+        for (int i = 0; i < 5; i++) {
+            URL u = new URL(url);
+            HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+
+            if (conn instanceof HttpsURLConnection) {
+                HttpsURLConnection https = (HttpsURLConnection) conn;
+                try {
+                    SSLContext sslContext = createLenientSslContext();
+                    https.setSSLSocketFactory(sslContext.getSocketFactory());
+                    https.setHostnameVerifier(LENIENT_HOSTNAME_VERIFIER);
+                } catch (Exception ignored) {}
+            }
+
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(TIMEOUT);
+            conn.setReadTimeout(TIMEOUT);
+            conn.setRequestProperty("User-Agent", "AndroidMusicPlayer/1.0");
+            conn.setRequestProperty("Range", "bytes=0-" + (maxBytes - 1));
+            conn.setInstanceFollowRedirects(false);
+
+            if (needAuth && authHeader != null) {
+                conn.setRequestProperty("Authorization", authHeader);
+            }
+
+            int code = conn.getResponseCode();
+
+            if (code == 301 || code == 302 || code == 307 || code == 308) {
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (location == null || location.isEmpty()) break;
+                url = location;
+                needAuth = false;
+                continue;
+            }
+
+            if (code == 200 || code == 206) {
+                try {
+                    try (InputStream is = conn.getInputStream();
+                         ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                        byte[] buf = new byte[8192];
+                        int len;
+                        int total = 0;
+                        while ((len = is.read(buf)) != -1 && total < maxBytes) {
+                            baos.write(buf, 0, len);
+                            total += len;
+                        }
+                        return baos.toByteArray();
+                    }
+                } finally {
+                    conn.disconnect();
+                }
+            }
+
+            conn.disconnect();
+            throw new IOException("HTTP " + code);
+        }
+
+        throw new IOException("Too many redirects");
     }
 
     /** 使用 HttpURLConnection 发送标准 HTTP 方法（OPTIONS、GET 等） */
