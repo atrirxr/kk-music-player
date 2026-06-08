@@ -1,4 +1,4 @@
-# Audio Player
+# kk player
 
 一个基于 Java 的 Android 音乐播放器，基于 [shahadot786/android-music-player](https://github.com/shahadot786/android-music-player) 二次开发，支持本地音乐与 WebDAV 云音乐播放。采用 Material 3 设计，搭载 ExoPlayer / Media3 播放引擎，提供后台播放和沉浸式播放界面。
 
