@@ -1,6 +1,6 @@
 # Audio Player
 
-一个基于 Java 的 Android 音乐播放器，基于 [shahadot786/android-music-player](https://github.com/shahadot786/android-music-player) 二次开发。，支持本地音乐与 WebDAV 云音乐播放。采用 Material 3 设计，搭载 ExoPlayer / Media3 播放引擎，提供后台播放和沉浸式播放界面。
+一个基于 Java 的 Android 音乐播放器，基于 [shahadot786/android-music-player](https://github.com/shahadot786/android-music-player) 二次开发，支持本地音乐与 WebDAV 云音乐播放。采用 Material 3 设计，搭载 ExoPlayer / Media3 播放引擎，提供后台播放和沉浸式播放界面。
 
 ## 功能
 
@@ -69,7 +69,7 @@ Release 签名使用 `release.jks`，密码 `android123`。
 ## 项目结构
 
 ```
-app/src/main/java/com/shahadot/android_music_player/
+app/src/main/java/com/ran/kk_music_player/
 ├── MainActivity.java          # 主入口，底部导航 + 迷你播放条
 ├── MusicFragment.java         # 本地音乐列表
 ├── CloudFragment.java         # 云音乐登录/浏览
@@ -96,4 +96,4 @@ app/src/main/java/com/shahadot/android_music_player/
 
 ## 版本
 
-当前版本：v2.0 | `applicationId`: `com.shahadot.android_music_player`
+当前版本：v2.1 | `applicationId`: `com.ran.kk_music_player`
