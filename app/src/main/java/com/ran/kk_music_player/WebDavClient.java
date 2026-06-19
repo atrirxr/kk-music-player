@@ -147,22 +147,19 @@ public class WebDavClient {
      * 例如: baseUrl="https://host/dav", href="/dav/music/" → "/music/"
      */
     public String relativizePath(String href) {
-        if (href == null) return "/";
+        return WebDavPathUtils.relativizePath(href, getMountPath());
+    }
+
+    public boolean isSamePath(String path, String href) {
+        return WebDavPathUtils.isSamePath(path, href, getMountPath());
+    }
+
+    private String getMountPath() {
         try {
-            URL parsed = new URL(baseUrl);
-            String mountPath = parsed.getPath();
-            if (mountPath != null && !mountPath.isEmpty() && !"/".equals(mountPath)) {
-                if (href.startsWith(mountPath)) {
-                    String relative = href.substring(mountPath.length());
-                    if (relative.isEmpty()) relative = "/";
-                    if (!relative.startsWith("/")) relative = "/" + relative;
-                    return relative;
-                }
-            }
-        } catch (Exception ignored) {}
-        // 如果无法解析，确保以 / 开头
-        if (!href.startsWith("/")) href = "/" + href;
-        return href;
+            return new URL(baseUrl).getPath();
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
     public String getLastError() {

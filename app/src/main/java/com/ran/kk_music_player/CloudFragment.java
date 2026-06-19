@@ -497,7 +497,9 @@ public class CloudFragment extends Fragment implements CloudSongAdapter.OnItemCl
                 List<CloudFile> dirs = new ArrayList<>();
                 for (CloudFile f : files) {
                     if (f.isDirectory) {
-                        dirs.add(f);
+                        if (!webDavClient.isSamePath(path, f.href)) {
+                            dirs.add(f);
+                        }
                     } else if (f.isAudioFile()) {
                         f.directUrl = webDavClient.getDirectUrl(f.href);
                         musicFiles.add(f);

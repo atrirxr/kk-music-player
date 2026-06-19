@@ -7,5 +7,5 @@
     <color name="yellow">#FFC107</color>
     <color name="blue">#2563EB</color>
     <color name="nav_selected">#2563EB</color>
-    <color name="nav_unselected">#9999A0</color>
+    <color name="nav_unselected">#5A5C66</color>
 </resources>

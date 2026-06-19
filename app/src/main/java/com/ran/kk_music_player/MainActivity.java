@@ -6,9 +6,7 @@ import android.content.ContentUris;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.drawable.Drawable;
-import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -25,7 +23,6 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.Player;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
-import androidx.palette.graphics.Palette;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.target.CustomTarget;
@@ -250,52 +247,28 @@ public class MainActivity extends AppCompatActivity {
                     public void onResourceReady(@NonNull Bitmap resource,
                                                 @Nullable Transition<? super Bitmap> transition) {
                         binding.miniAlbumArt.setImageBitmap(resource);
-                        applyMiniPlayerGradient(resource);
                     }
 
                     @Override
                     public void onLoadCleared(@Nullable Drawable placeholder) {
                         binding.miniAlbumArt.setImageDrawable(placeholder);
-                        resetMiniPlayerGradient();
                     }
 
                     @Override
                     public void onLoadFailed(@Nullable Drawable errorDrawable) {
                         binding.miniAlbumArt.setImageDrawable(errorDrawable);
-                        resetMiniPlayerGradient();
                     }
                 });
     }
 
     private void fallbackMiniPlayerCover() {
         binding.miniAlbumArt.setImageResource(R.drawable.ic_music_note_24);
-        resetMiniPlayerGradient();
     }
 
     private boolean isCloudSong(Song song) {
         return song.albumId == 0
                 && song.data != null
                 && (song.data.startsWith("http://") || song.data.startsWith("https://"));
-    }
-
-    private void applyMiniPlayerGradient(Bitmap bitmap) {
-        Palette.from(bitmap).generate(palette -> {
-            int color = palette != null
-                    ? palette.getDominantColor(0xFF37474F) : 0xFF37474F;
-            GradientDrawable gradient = new GradientDrawable(
-                    GradientDrawable.Orientation.TOP_BOTTOM,
-                    new int[]{Color.WHITE, color}
-            );
-            binding.miniPlayer.setBackground(gradient);
-        });
-    }
-
-    private void resetMiniPlayerGradient() {
-        GradientDrawable fallback = new GradientDrawable(
-                GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{Color.WHITE, 0xFFDDDDDD}
-        );
-        binding.miniPlayer.setBackground(fallback);
     }
 
     private void updateMiniPlayerUI(long position, long duration) {
